@@ -1,0 +1,61 @@
+from flask import Flask, request, jsonify
+import random
+from dotenv import load_dotenv
+import os
+import google.generativeai as genai
+from langchain_google_genai import ChatGoogleGenerativeAI
+from flask import Flask, request, jsonify, render_template
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+
+
+# Greetings inputs and responses
+GREET_INPUTS = ("hello", "hi", "greetings", "sup", "what's up", "hey")
+GREET_RESPONSES = ["hi", "hey", "*nods*", "hi there", "hello", "I am glad! You are talking to me"]
+
+
+def greet(sentence):
+    """Check if the user's input is a greeting and return a random greeting response."""
+    for word in sentence.split():
+        if word.lower() in GREET_INPUTS:
+            return random.choice(GREET_RESPONSES)
+
+
+# Load environment variables
+load_dotenv()
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    raise ValueError("GOOGLE_API_KEY is not set in the environment variables")
+
+# Configure the generative AI model
+genai.configure(api_key=api_key)
+llm = ChatGoogleGenerativeAI(model="gemini-pro")
+
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_response = request.json.get('message', '').strip().lower()
+
+    if user_response == 'bye':
+        return jsonify({"response": "Goodbye! Take care."})
+    elif user_response in ['thanks', 'thank you']:
+        return jsonify({"response": "You are welcome."})
+    else:
+        # Check if the user input is a greeting
+        greet_response = greet(user_response)
+        if greet_response:
+            return jsonify({"response": greet_response})
+        else:
+            # Process the user input with the generative AI model
+            result = llm.invoke(user_response)
+            return jsonify({"response": result.content})
+
+
+if __name__ == '__main__':
+    app.run()
